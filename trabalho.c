@@ -27,7 +27,6 @@ void liberarFilme(tpFilm **fm)
 	*fm = NULL;
 }
 
-
 void imprimirFilme(tpFilm *fm)
 {
 	printf("titleType: %d\n"
@@ -51,7 +50,7 @@ int escreverFilme(tpFilm *fm, FILE *f)
 
 tpFilm *lerFilme(FILE *f)
 {
-	tpFilm *fm = (tpFilm*) malloc(sizeof(tpFilm)); // aloca tamanho da struct tpFilm
+	tpFilm *fm = (tpFilm *)malloc(sizeof(tpFilm)); // aloca tamanho da struct tpFilm
 	if (fread(fm, sizeof(tpFilm), 1, f) > 0)
 		return fm;
 	free(fm);
@@ -96,25 +95,35 @@ void liberarParticionador(tpParticionador **part)
 }
 
 // Se um texto A eh menor que B em ordem alfabetica
+enum saidaComparar
+{
+	MENORQUE,
+	MAIORQUE,
+	IGUAL
+};
 
-int menorQue(char *string1, char *string2)
+int comparar(char *string1, char *string2)
 {
 
 	char a;
 	char b;
 
-	for (int indice = 0; ((indice < 422) || ((string1[indice] != '\0') || (string2[indice] != '\0'))); indice++)
+	for (int indice = 0, a = toupper(string1[indice]), b = toupper(string2[indice]);
+		 (indice < MAX_ORIGINAL_TITLE) && (a != '\0') && (b != '\0');
+		 indice++, a = toupper(string1[indice]), b = toupper(string2[indice]))
 	{
-		a = toupper(string1[indice]);
-		b = toupper(string2[indice]);
-
-		if (a < b)		// achei alguma letra de A que eh menor que B
-			return 1;								// menor que
-		else if (a > b) // achei alguma letra em A que eh maior que B, portanto B eh menor
-			return 0;								// maior que
+		if (a < b)			 // achei alguma letra de A que eh menor que B
+			return MENORQUE; // menor que
+		else if (a > b)		 // achei alguma letra em A que eh maior que B, portanto B eh menor
+			return MAIORQUE; // maior que
 	}
 
-	return a == '\0';
+	if (a == '\0' && b == '\0')
+		return IGUAL;
+	else if (a == '\0')
+		return MENORQUE;
+	else
+		return MAIORQUE;
 }
 
 int particionar(FILE *f, char *prefix, int memSize)
@@ -152,7 +161,7 @@ int particionar(FILE *f, char *prefix, int memSize)
 				{
 					// PROCURA O ELEMENTO COM MENOR CHAVE NA MEMORIA
 					for (int i = 0; i < memSize; i++)
-						if (part->memoria[i] != NULL && menorQue(part->memoria[i]->originalTitle, part->memoria[part->r]->originalTitle))
+						if (part->memoria[i] != NULL && comparar(part->memoria[i]->originalTitle, part->memoria[part->r]->originalTitle) == MENORQUE)
 							part->r = i;
 
 					// ESCREVE O ELEMENTO
@@ -164,7 +173,7 @@ int particionar(FILE *f, char *prefix, int memSize)
 						if (aux != NULL)
 						{
 							// SE MENOR QUE O ESCOLHIDO, ADICIONA AO RESERVATORIO
-							if (menorQue(aux->originalTitle, part->memoria[part->r]->originalTitle))
+							if (comparar(aux->originalTitle, part->memoria[part->r]->originalTitle) == MENORQUE)
 							{
 								part->reservatorio[part->indReserv] = aux;
 								part->indReserv++;
@@ -208,7 +217,7 @@ int particionar(FILE *f, char *prefix, int memSize)
 				if (part->r != -1)
 				{
 					for (int i = 0; i < memSize; i++)
-						if (part->memoria[i] != NULL && menorQue(part->memoria[i]->originalTitle, part->memoria[part->r]->originalTitle))
+						if (part->memoria[i] != NULL && comparar(part->memoria[i]->originalTitle, part->memoria[part->r]->originalTitle) == MENORQUE)
 							part->r = i;
 					// ESCREVE E LIBERA O MENOR
 					escreverFilme(part->memoria[part->r], fPart);
@@ -230,73 +239,72 @@ int particionar(FILE *f, char *prefix, int memSize)
 	return partGeradas;
 }
 
-void pesquisa_binaria(FILE* arquivo, char *originalTitle){
-    int tam_estrutura      = sizeof(tpFilm);
-    int tam_arquivo        = 0;
-    int total_registros    = 0;
-    tpFilm filme;
+tpFilm *pesquisa_binaria(FILE *arquivo, char *originalTitle)
+{
+	int tam_estrutura = sizeof(tpFilm);
+	int tam_arquivo = 0;
+	int total_registros = 0;
 
-    fseek(arquivo, 0L, SEEK_END); //posiciona no final do arquivo
-    tam_arquivo = ftell(arquivo); //retorna quantos bytes foram "lidos" até o momento
-    fseek(arquivo, 0L, SEEK_SET); //reposiciona o ponteiro para a posição desejada, neste caso, inicio do arquivo
+	fseek(arquivo, 0L, SEEK_END); // posiciona no final do arquivo
+	tam_arquivo = ftell(arquivo); // retorna quantos bytes foram "lidos" até o momento
+	fseek(arquivo, 0L, SEEK_SET); // reposiciona o ponteiro para a posição desejada, neste caso, inicio do arquivo
 
-    total_registros = tam_arquivo / tam_estrutura;
+	total_registros = tam_arquivo / tam_estrutura;
 
-    int achou = 0;
+	int inicio_parte = 0;
+	int fim_parte = total_registros;
+	int posicao_atual = 0;
+	tpFilm *filme = NULL;
 
-    int inicio_parte = 0;
-    int fim_parte = total_registros;
-    int posicao_atual = 0;
+	int i = 0;
 
-    int i = 0;
+	int comparacoes = 0;
 
-    int comparacoes = 0;
+	do
+	{
+		posicao_atual = ((fim_parte - inicio_parte) / 2) + inicio_parte;
 
-    do {
-        posicao_atual = ((fim_parte - inicio_parte) / 2) + inicio_parte;
+		fseek(arquivo, posicao_atual * tam_estrutura, SEEK_SET);
+		tpFilm *fm = lerFilme(arquivo);
 
-        fseek(arquivo, posicao_atual * tam_estrutura, SEEK_SET);
-        fread(&filme, tam_estrutura, 1, arquivo);
+		int saidaComparacao = comparar(originalTitle, &(fm->originalTitle));
 
-        for (i = 0; i < 6; i++)
-            if (originalTitle[i] > filme.originalTitle[i]){
-                inicio_parte = posicao_atual + 1;
-                break;
-            }
-            else if (originalTitle[i] < filme.originalTitle[i]){
-                fim_parte = posicao_atual - 1;
-                break;
-            }
+		if (saidaComparacao == MAIORQUE)
+			inicio_parte = posicao_atual + 1;
+		else if (saidaComparacao == MENORQUE)
+			fim_parte = posicao_atual - 1;
+		else
+			filme = fm;
 
-        if (i == 6)
-            achou = 1;
+		if (filme == NULL)
+			liberarFilme(&fm);
+		else
+			break;
 
-        comparacoes++;
-    } while(!achou && (fim_parte >= inicio_parte));
-    fclose(arquivo);
+	} while (fim_parte >= inicio_parte);
 
-    if (achou)
-        imprimirFilme(&filme);
-    else
-        printf("Original title %s not found \n", originalTitle);
-
-    printf("Comparações %d\n", comparacoes);
+	return filme;
 }
 
 int main(int ac, char **av)
 {
-    FILE *arquivo_entrada = fopen(av[1], "r");
-    assert(arquivo_entrada != NULL);
-	
+	FILE *arquivo_entrada = fopen(av[1], "r");
+	assert(arquivo_entrada != NULL);
+
 	//particionar(arquivo_entrada, "test", 250);
 
-    for (int i = 0; i < 100; i++){
-		tpFilm* fm = lerFilme(arquivo_entrada);
+	for (int i = 0; i < 100; i++)
+	{
+		tpFilm *fm = lerFilme(arquivo_entrada);
 		imprimirFilme(fm);
-		//escreverFilme(fm, test);
+		// escreverFilme(fm, test);
 		liberarFilme(&fm);
-    }
-	    
-    fclose(arquivo_entrada);
+	}
+
+	tpFilm *fm = pesquisa_binaria(arquivo_entrada, "Cream - Schwabing-Report");
+	if (fm != NULL)
+		imprimirFilme(fm);
+
+	fclose(arquivo_entrada);
 	return EXIT_SUCCESS;
 }
