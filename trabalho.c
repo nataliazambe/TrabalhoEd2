@@ -44,41 +44,16 @@ void imprimirFilme(tpFilm *fm)
 int escreverFilme(tpFilm *fm, FILE *f)
 {
 	if (fm != NULL)
-		if (fwrite(fm->titleType, sizeof(char), MAX_TITLE_TYPE, f) > 0)
-		{
-
-			fwrite(fm->primaryTitle, sizeof(char), MAX_PRIMARY_TITLE, f);
-			fwrite(fm->originalTitle, sizeof(char), MAX_ORIGINAL_TITLE, f);
-			fwrite(&fm->isAdult, sizeof(unsigned char), 1, f);
-			fwrite(&fm->startYear, sizeof(unsigned short int), 1, f);
-			fwrite(&fm->endYear, sizeof(unsigned short int), 1, f);
-			fwrite(fm->runtimeMinutes, sizeof(char), MAX_RUNTIME_MINUTES, f);
-			fwrite(fm->genres, sizeof(char), MAX_GENRES, f);
-
+		if (fwrite(fm, sizeof(tpFilm), 1, f) > 0)
 			return 1;
-		}
 	return 0;
 }
 
 tpFilm *lerFilme(FILE *f)
 {
-	tpFilm *fm = (tpFilm *)malloc(sizeof(tpFilm)); // aloca tamanho da struct tpFilm
-	if (fread(fm->titleType, sizeof(char), MAX_TITLE_TYPE, f) > 0)
-	{ /*onde vai botar, qual tam, quantas vezes fazer isso (caso haja vetor, caso cont. 1), arquivo de onde vou ler.
-Colocar no espaco var - quatro bytes
-for i in vezes:
-onde[i] = ler(arquivo, quanto)*/
-
-		fread(fm->primaryTitle, sizeof(char), MAX_PRIMARY_TITLE, f);
-		fread(fm->originalTitle, sizeof(char), MAX_ORIGINAL_TITLE, f);
-		fread(&fm->isAdult, sizeof(unsigned char), 1, f);
-		fread(&fm->startYear, sizeof(unsigned short int), 1, f);
-		fread(&fm->endYear, sizeof(unsigned short int), 1, f);
-		fread(fm->runtimeMinutes, sizeof(char), MAX_RUNTIME_MINUTES, f);
-		fread(fm->genres, sizeof(char), MAX_GENRES, f);
-
+	tpFilm *fm = (tpFilm*) malloc(sizeof(tpFilm)); // aloca tamanho da struct tpFilm
+	if (fread(fm, sizeof(tpFilm), 1, f) > 0)
 		return fm;
-	}
 	free(fm);
 	return NULL;
 }
@@ -310,12 +285,18 @@ void pesquisa_binaria(FILE* arquivo, char *originalTitle){
 
 int main(int ac, char **av)
 {
-	FILE *arquivo_entrada = fopen("qualquer.dat", "r");
+    FILE *arquivo_entrada = fopen(av[1], "r");
+    assert(arquivo_entrada != NULL);
+	
+	//particionar(arquivo_entrada, "test", 250);
 
-	tpFilm film;
-	assert(arquivo_entrada != NULL);
-	particionar(arquivo_entrada, "part", 10000);
-
-	fclose(arquivo_entrada);
+    for (int i = 0; i < 100; i++){
+		tpFilm* fm = lerFilme(arquivo_entrada);
+		imprimirFilme(fm);
+		//escreverFilme(fm, test);
+		liberarFilme(&fm);
+    }
+	    
+    fclose(arquivo_entrada);
 	return EXIT_SUCCESS;
 }
