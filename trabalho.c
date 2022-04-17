@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <ctype.h>
+#include <getopt.h>
 
 #define MAX_TITLE_TYPE 13
 #define MAX_PRIMARY_TITLE 422
@@ -286,25 +287,117 @@ tpFilm *pesquisa_binaria(FILE *arquivo, char *originalTitle)
 	return filme;
 }
 
-int main(int ac, char **av)
+// Manual
+void ajuda(char *name)
 {
-	FILE *arquivo_entrada = fopen(av[1], "r");
-	assert(arquivo_entrada != NULL);
+	fprintf(stderr, "\
+	[uso] %s <opcoes>\n\
+	-h, --help          mostra essa tela e sai.\n\
+	-m, --modo=MODO     operacao a ser executada.\n\
+	se MODO == 'particionar'\n\
+		-p, --prefixo=PREFIXO                nome que precede cada parte\n\
+		-r, --max-registros=MAX_REGISTROS    quantidade maxima de registros na memoria\n\
+		-a, --arquivo=NOME_ARQUIVO           nome do arquivo na raiz para particionar\n\
+	se MODO == 'buscar'\n\
+		-n, --nome=TITULO                    original title do registro a buscar\n\
+		-a, --arquivo=NOME_ARQUIVO           nome do arquivo ordenado na raiz para buscar\n\
+	se MODO == 'integrar'\n\
+		-q, --max-arquivos=MAX_ARQUIVOS      quantidade maxima de arquivos abertos simultaneamente\n\
+		-a, --arquivo=NOME_ARQUIVO           nome do arquivo ordenado das pares a ser salvo na raiz\n\
+",
+			name);
+	exit(-1);
+}
 
-	//particionar(arquivo_entrada, "test", 250);
+int main(int argc, char **argv)
+{
+	int opt;
 
-	for (int i = 0; i < 100; i++)
+	/* Variáveis que receberão os argumentos
+	 * das opções. */
+	char *modo = NULL, *prefixo = NULL, *nome = NULL,
+	*arquivo = NULL;
+
+	int max_registros = 0, max_arquivos = 0;
+
+	const struct option stopcoes[] = {
+		{"help", no_argument, 0, 'h'},
+		{"modo", required_argument, 0, 'm'},
+		{"prefixo", required_argument, 0, 'p'},
+		{"nome", required_argument, 0, 'n'},
+		{"max-registros", required_argument, 0, 'r'},
+		{"arquivo", required_argument, 0, 'a'},
+		{"max-arquivos", required_argument, 0, 'q'},
+		{0, 0, 0, 0},
+	};
+
+	if (argc < 2)
+		ajuda(argv[0]);
+
+	while ((opt = getopt_long(argc, argv, "hn:m:p:n:r:a:q", stopcoes, NULL)) > 0)
 	{
-		tpFilm *fm = lerFilme(arquivo_entrada);
-		imprimirFilme(fm);
-		// escreverFilme(fm, test);
-		liberarFilme(&fm);
+		switch (opt)
+		{
+		case 'h': /* -h ou --help */
+			ajuda(argv[0]);
+			break;
+		case 'm': /* -m ou --modo */
+			modo = optarg;
+			break;
+		case 'p': /* -p ou --prefixo */
+			prefixo = optarg;
+			break;
+		case 'n': /* -n ou --nome */
+			nome = optarg;
+			break;
+		case 'r': /* -r ou --max-registros */
+			max_registros = atoi(optarg);
+			break;
+		case 'a': /* -a ou --arquivo */
+			arquivo = optarg;
+			break;
+		case 'q': /* -q ou --max-arquivos */
+			max_arquivos = atoi(optarg);
+			break;
+		default:
+			fprintf(stderr, "Opcao invalida ou faltando argumento: `%c'\n", optopt);
+			return -1;
+		}
 	}
 
-	tpFilm *fm = pesquisa_binaria(arquivo_entrada, "Cream - Schwabing-Report");
-	if (fm != NULL)
-		imprimirFilme(fm);
+	assert (modo != NULL);
+	assert (arquivo != NULL);
+	FILE *f = fopen(arquivo, "r");
+	assert (f != NULL);
+	if (comparar(modo, "particionar") == IGUAL)
+	{
+	    assert (prefixo != NULL);
+	    assert(max_registros > 0);
+		int qtde = particionar(f, prefixo, max_registros);
+		printf("%d particoes geradas", qtde);
+	}
+	else if (comparar(modo, "buscar") == IGUAL)
+	{
+		assert (nome != NULL);
+		tpFilm *fm = pesquisa_binaria(f, nome);
+		if (fm != NULL)
+		{
+			imprimirFilme(fm);
+			liberarFilme(&fm);
+		}
+		else
+			printf("Filme nao encontrado");
+	}
+	else if (comparar(modo, "integrar") == IGUAL)
+	{
+		assert (max_arquivos > 0);
+		// coloquem a parte da integração aqui
+	}
+	else
+	{
+		printf("Modo invalido");
+	}
+	fclose(f);
 
-	fclose(arquivo_entrada);
-	return EXIT_SUCCESS;
+	return 0;
 }
