@@ -19,11 +19,12 @@ busca binária, acessando de forma direta o arquivo e executando os saltos de ac
 1. Compilar usando `make`
 2. Escolher uma das opções abaixo utilizando o binário `bin*` gerado
 ```
--h, --help          mostra a tela de ajuda
+[uso] <binario> <opcoes>
+-h, --help          mostra essa tela e sai.
 -m, --modo=MODO     operacao a ser executada.
 se MODO == 'particionar'
 	-p, --prefixo=PREFIXO                nome que precede cada parte
-	-r, --max-registros=MAX_REGISTROS    quantidade maxima de registros na memoria
+	-r, --max-registros=MAX_REGISTROS    metade da quantidade maxima de registros na memoria
 	-a, --arquivo=NOME_ARQUIVO           nome do arquivo na raiz para particionar
 se MODO == 'buscar'
 	-n, --nome=TITULO                    original title do registro a buscar
@@ -31,9 +32,40 @@ se MODO == 'buscar'
 se MODO == 'integrar'
 	-q, --max-arquivos=MAX_ARQUIVOS      quantidade maxima de arquivos abertos simultaneamente
 	-a, --arquivo=NOME_ARQUIVO           nome do arquivo ordenado das pares a ser salvo na raiz
+	-p, --prefixo=PREFIXO				 nome que precede cada parte
 ```
+
+## Exemplos
+### Particionar e integrar:
+```sh
+./bin --modo=particionar --prefixo=test --arquivo=test.dat
+./bin --modo=integrar --prefixo=test --max-arquivos=10 --arquivo=ordenado.dat
+```
+### Busca binária
+```sh
+./bin --modo=buscar --nome="1001 Arabian Nights" --arquivo=ordenado.dat
+titleType: -1414089584
+primaryTitle: 1001 Arabian Nights
+originalTitle: 1001 Arabian Nights
+isAdult: 0
+startYear: 1959
+endYear: 0
+runtimeMinutes: 75
+genres: Animation,Family,Fantasy
+```
+```sh
+./bin --modo=buscar --nome="4. april 2020" --arquivo=ordenado.dat
+titleType: 66249872
+primaryTitle: 4. april 2020
+originalTitle: 4. april 2020
+isAdult: 0
+startYear: 2020
+endYear: 0
+runtimeMinutes: \N
+genres: Comedy
+```
+
+> Testes conduzidos em `Linux`
 
 ## Autores
 * Natalia Zambe
-* Guilherme Magno
-* Matheus Amorim

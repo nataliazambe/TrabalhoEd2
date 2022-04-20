@@ -9,7 +9,9 @@
 #define MAX_ORIGINAL_TITLE 422
 #define MAX_RUNTIME_MINUTES 6
 #define MAX_GENRES 33
+#define MAX_FILENAME 50
 
+// PARTICIONAMENTO POR SELEÇÃO NATURAL
 typedef struct stFilm
 {
 	char titleType[MAX_TITLE_TYPE],
@@ -105,24 +107,30 @@ enum saidaComparar
 
 int comparar(char *string1, char *string2)
 {
-
+	int indice;
 	char a;
 	char b;
 
-	for (int indice = 0, a = toupper(string1[indice]), b = toupper(string2[indice]);
-		 (indice < MAX_ORIGINAL_TITLE) && (a != '\0') && (b != '\0');
-		 indice++, a = toupper(string1[indice]), b = toupper(string2[indice]))
+	for (indice = 0;
+		 (indice < MAX_ORIGINAL_TITLE) &&
+		 (string1[indice] != '\0') &&
+		 (string2[indice] != '\0');
+		 indice++)
 	{
+		a = toupper(string1[indice]);
+		b = toupper(string2[indice]);
+
 		if (a < b)			 // achei alguma letra de A que eh menor que B
 			return MENORQUE; // menor que
 		else if (a > b)		 // achei alguma letra em A que eh maior que B, portanto B eh menor
 			return MAIORQUE; // maior que
 	}
 
-	if (a == '\0' && b == '\0')
-		return IGUAL;
-	else if (a == '\0')
-		return MENORQUE;
+	if (string1[indice] == '\0')
+		if (string2[indice] == '\0')
+			return IGUAL;
+		else
+			return MENORQUE;
 	else
 		return MAIORQUE;
 }
@@ -135,7 +143,7 @@ int particionar(FILE *f, char *prefix, int memSize)
 	// VERIFICA SE O ARQUIVO EXISTE
 	if (f != NULL)
 	{
-		char stringAux[50];
+		char stringAux[MAX_FILENAME];
 		tpFilm *aux;
 		FILE *fPart;
 
@@ -146,7 +154,7 @@ int particionar(FILE *f, char *prefix, int memSize)
 		{
 			// CRIA A STRING PARA O NOME DO ARQUIVO
 			sprintf(stringAux, "parts/%s%d.dat", prefix, partGeradas);
-			fPart = fopen(stringAux, "wb");
+			fPart = fopen(stringAux, "w");
 			while (part->indReserv < memSize)
 			{
 				// PROCURA PRIMEIRO ELEMENTO NA MEMORIA
@@ -240,11 +248,12 @@ int particionar(FILE *f, char *prefix, int memSize)
 	return partGeradas;
 }
 
+// BUSCA BINÁRIA
 tpFilm *pesquisa_binaria(FILE *arquivo, char *originalTitle)
 {
-	int tam_estrutura = sizeof(tpFilm);
-	int tam_arquivo = 0;
-	int total_registros = 0;
+	long tam_estrutura = sizeof(tpFilm);
+	long tam_arquivo = 0;
+	long total_registros = 0;
 
 	fseek(arquivo, 0L, SEEK_END); // posiciona no final do arquivo
 	tam_arquivo = ftell(arquivo); // retorna quantos bytes foram "lidos" até o momento
@@ -252,9 +261,9 @@ tpFilm *pesquisa_binaria(FILE *arquivo, char *originalTitle)
 
 	total_registros = tam_arquivo / tam_estrutura;
 
-	int inicio_parte = 0;
-	int fim_parte = total_registros;
-	int posicao_atual = 0;
+	long inicio_parte = 0;
+	long fim_parte = total_registros;
+	long posicao_atual = 0;
 	tpFilm *filme = NULL;
 
 	int i = 0;
@@ -268,7 +277,7 @@ tpFilm *pesquisa_binaria(FILE *arquivo, char *originalTitle)
 		fseek(arquivo, posicao_atual * tam_estrutura, SEEK_SET);
 		tpFilm *fm = lerFilme(arquivo);
 
-		int saidaComparacao = comparar(originalTitle, &(fm->originalTitle));
+		int saidaComparacao = comparar(originalTitle, fm->originalTitle);
 
 		if (saidaComparacao == MAIORQUE)
 			inicio_parte = posicao_atual + 1;
@@ -287,6 +296,181 @@ tpFilm *pesquisa_binaria(FILE *arquivo, char *originalTitle)
 	return filme;
 }
 
+// INTEGRAÇÃO POR INTERCALAÇÃO ÓTIMA
+typedef struct stFilenameList
+{
+	struct stFilenameList *previous;
+	char *filename;
+	struct stFilenameList *next;
+} tpFilenameList;
+
+typedef struct stFilenameQueue
+{
+	struct stFilenameList *first;
+	struct stFilenameList *last;
+} tpFilenameQueue;
+
+tpFilenameQueue *criarFilenameQueue()
+{
+	tpFilenameQueue *queue = (tpFilenameQueue *)malloc(sizeof(tpFilenameQueue));
+	queue->first = NULL;
+	queue->last = NULL;
+	return queue;
+}
+
+void inserirArquivoNaFila(tpFilenameQueue *queue, char *filename)
+{
+	tpFilenameList *no = (tpFilenameList *)malloc(sizeof(tpFilenameList));
+
+	// COPIA A STRING
+	char *filenameCopia = (char *)malloc(sizeof(char) * MAX_FILENAME);
+	int i;
+	for (i = 0; filename[i] != '\0'; i++)
+		filenameCopia[i] = filename[i];
+	filenameCopia[i] = '\0';
+
+	// INICIALIZA OS ATRIBUTOS
+	no->filename = filenameCopia;
+	no->next = NULL;
+
+	// INICIO DA FILA SE VAZIO
+	if (queue->last == NULL)
+		queue->first = no;
+	// SENÃO COLOCA NO FIM DA FILA
+	else
+	{
+		queue->last->next = no;
+		no->previous = queue->last;
+	}
+
+	queue->last = no;
+}
+
+char *popArquivoNaFila(tpFilenameQueue *queue)
+{
+	// SE VAZIO, RETORNA NULO
+	if (queue->first == NULL)
+		return NULL;
+	// SENÃO RETORNA O PRIMEIRO
+	else
+	{
+		tpFilenameList *first = queue->first;
+		queue->first = first->next;
+
+		// LIBERA O ARQUIVO
+		char *filename = first->filename;
+		free(first);
+
+		// SE PRIMEIRO, LIMPA A FILA
+		if (first == queue->last)
+			queue->last = NULL;
+
+		return filename;
+	}
+}
+
+int verificarFilaVazia(tpFilenameQueue *queue)
+{
+	return queue->first == NULL;
+}
+
+int integrar(char *nome_saida, char *prefix, int max_arquivos)
+{
+	tpFilenameQueue *fila = criarFilenameQueue();
+	FILE *saida = NULL;
+
+	// PROCURO QUEM SÃO MINHAS PARTIÇÕES
+	char stringAux[MAX_FILENAME];
+	int i;
+	for (i = 0; 1; i++)
+	{
+		sprintf(stringAux, "parts/%s%d.dat", prefix, i);
+		saida = fopen(stringAux, "r");
+		if (saida == NULL)
+			break;
+		else
+		{
+			inserirArquivoNaFila(fila, stringAux);
+			fclose(saida);
+		}
+	}
+
+	assert(i > 1 && "existe apenas uma ou nenhuma particao ordenada");
+
+	// NUMERO MAXIMO DE FILES
+	int cntIntermediarios = 0;
+	max_arquivos--;
+	FILE *entradas[max_arquivos];
+	tpFilm *filmes[max_arquivos];
+	char *paraRemover[max_arquivos];
+	int menor;
+
+	while (1)
+	{
+		// ABRO AS PARTIÇÕES
+		int abertos = 0;
+		for (abertos = 0; (abertos < max_arquivos) && !verificarFilaVazia(fila); abertos++)
+		{
+			char *filename = popArquivoNaFila(fila);
+			entradas[abertos] = fopen(filename, "r");
+			filmes[abertos] = NULL;
+			paraRemover[abertos] = filename;
+		}
+
+		if (abertos > 1)
+		{
+			// COLOCO NO FIM DA FILA PARA JUNTAR AO FINAL
+			sprintf(stringAux, "parts/__tmp_%d.dat", cntIntermediarios);
+			inserirArquivoNaFila(fila, stringAux);
+			saida = fopen(stringAux, "w");
+
+			// COLOCO O MENOR DOS ABERTOS NO INTERMEDIARIO
+			while (1)
+			{
+				menor = -1;
+				for (i = 0; i < abertos; i++)
+				{
+					if (filmes[i] == NULL)
+						filmes[i] = lerFilme(entradas[i]);
+
+					if (filmes[i] != NULL)
+						if (menor < 0 ||
+							comparar(filmes[i]->originalTitle,
+									 filmes[menor]->originalTitle) == MENORQUE)
+							menor = i;
+				}
+				if (menor > -1)
+				{
+					escreverFilme(filmes[menor], saida);
+					liberarFilme(&filmes[menor]);
+				}
+				else
+					break;
+			}
+			cntIntermediarios += 1;
+
+			// FECHO AS PARTIÇÕES
+			fclose(saida);
+			for (i = 0; i < abertos; i++)
+			{
+				fclose(entradas[i]);
+				remove(paraRemover[i]);
+				free(paraRemover[i]);
+			}
+		}
+		else
+			break;
+	}
+
+	free(fila);
+
+	// MOVO PARA A RAIZ E RENOMEIO
+	if (rename(stringAux, nome_saida) != 0)
+		printf("Nao foi possivel renomear, o arquivo esta localizado em: '%s'\n",
+			   stringAux);
+	return cntIntermediarios;
+}
+
 // Manual
 void ajuda(char *name)
 {
@@ -296,7 +480,7 @@ void ajuda(char *name)
 	-m, --modo=MODO     operacao a ser executada.\n\
 	se MODO == 'particionar'\n\
 		-p, --prefixo=PREFIXO                nome que precede cada parte\n\
-		-r, --max-registros=MAX_REGISTROS    quantidade maxima de registros na memoria\n\
+		-r, --max-registros=MAX_REGISTROS    metade da quantidade maxima de registros na memoria\n\
 		-a, --arquivo=NOME_ARQUIVO           nome do arquivo na raiz para particionar\n\
 	se MODO == 'buscar'\n\
 		-n, --nome=TITULO                    original title do registro a buscar\n\
@@ -304,6 +488,7 @@ void ajuda(char *name)
 	se MODO == 'integrar'\n\
 		-q, --max-arquivos=MAX_ARQUIVOS      quantidade maxima de arquivos abertos simultaneamente\n\
 		-a, --arquivo=NOME_ARQUIVO           nome do arquivo ordenado das pares a ser salvo na raiz\n\
+		-p, --prefixo=PREFIXO				 nome que precede cada parte\n\
 ",
 			name);
 	exit(-1);
@@ -316,7 +501,7 @@ int main(int argc, char **argv)
 	/* Variáveis que receberão os argumentos
 	 * das opções. */
 	char *modo = NULL, *prefixo = NULL, *nome = NULL,
-	*arquivo = NULL;
+		 *arquivo = NULL;
 
 	int max_registros = 0, max_arquivos = 0;
 
@@ -365,20 +550,26 @@ int main(int argc, char **argv)
 		}
 	}
 
-	assert (modo != NULL);
-	assert (arquivo != NULL);
-	FILE *f = fopen(arquivo, "r");
-	assert (f != NULL);
+	assert(modo != NULL);
+	assert(arquivo != NULL);
 	if (comparar(modo, "particionar") == IGUAL)
 	{
-	    assert (prefixo != NULL);
-	    assert(max_registros > 0);
+		FILE *f = fopen(arquivo, "r");
+		assert(f != NULL && "arquivo inexistente");
+
+		assert(prefixo != NULL);
+		assert(max_registros > 0);
 		int qtde = particionar(f, prefixo, max_registros);
-		printf("%d particoes geradas", qtde);
+		printf("%d particoes geradas\n", qtde);
+
+		fclose(f);
 	}
 	else if (comparar(modo, "buscar") == IGUAL)
 	{
-		assert (nome != NULL);
+		FILE *f = fopen(arquivo, "r");
+		assert(f != NULL && "arquivo inexistente");
+
+		assert(nome != NULL);
 		tpFilm *fm = pesquisa_binaria(f, nome);
 		if (fm != NULL)
 		{
@@ -386,18 +577,21 @@ int main(int argc, char **argv)
 			liberarFilme(&fm);
 		}
 		else
-			printf("Filme nao encontrado");
+			printf("Filme nao encontrado\n");
+
+		fclose(f);
 	}
 	else if (comparar(modo, "integrar") == IGUAL)
 	{
-		assert (max_arquivos > 0);
-		// coloquem a parte da integração aqui
+		assert(max_arquivos > 0);
+		assert(prefixo != NULL);
+		int qtde = integrar(arquivo, prefixo, max_arquivos);
+		printf("%d particoes intermediarias\n", qtde);
 	}
 	else
 	{
-		printf("Modo invalido");
+		printf("Modo invalido\n");
 	}
-	fclose(f);
 
 	return 0;
 }
